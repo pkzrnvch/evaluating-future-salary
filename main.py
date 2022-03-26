@@ -1,4 +1,5 @@
 import os
+from itertools import count
 
 import requests
 from dotenv import load_dotenv
@@ -38,24 +39,23 @@ def get_hh_statistics(keyword):
         'vacancy_search_field': 'name',
         'text': keyword,
     }
-    pages_number = 1
-    page = 0
     salaries_sum = 0
     vacancies_processed = 0
     vacancies_found = 0
-    while page < pages_number:
+    hh_max_page = 20
+    for page in range(hh_max_page):
         payload['page'] = page
         response = requests.get(url, params=payload)
         response.raise_for_status()
         hh_response = response.json()
         vacancies_found = hh_response['found']
-        pages_number = hh_response['pages']
+        if not hh_response['items']:
+            break
         for vacancy in hh_response['items']:
             predicted_salary = predict_rub_salary_hh(vacancy)
             if predicted_salary:
                 salaries_sum += predicted_salary
                 vacancies_processed += 1
-        page += 1
     if vacancies_processed:
         average_salary = int(salaries_sum / vacancies_processed)
     else:
@@ -80,21 +80,19 @@ def get_sj_statistics(keyword, superjob_secret_key):
     vacancies_found = 0
     salaries_sum = 0
     vacancies_processed = 0
-    page = 0
-    more_results = True
-    while more_results:
+    for page in count():
         sj_payload['page'] = page
         response = requests.get(sj_url, headers=sj_headers, params=sj_payload)
         response.raise_for_status()
         sj_response = response.json()
         vacancies_found = sj_response['total']
+        if not sj_response['objects']:
+            break
         for vacancy in sj_response['objects']:
             predicted_salary = predict_rub_salary_sj(vacancy)
             if predicted_salary:
                 salaries_sum += predicted_salary
                 vacancies_processed += 1
-        more_results = sj_response['more']
-        page += 1
     if vacancies_processed:
         average_salary = int(salaries_sum / vacancies_processed)
     else:
